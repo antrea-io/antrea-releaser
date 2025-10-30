@@ -1,0 +1,5 @@
+.env
+bin/
+changelog-model-output-*.json
+changelog-model-details-*.json
+
