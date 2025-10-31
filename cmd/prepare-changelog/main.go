@@ -39,6 +39,13 @@ const (
 	repoName  = "antrea"
 )
 
+var ignoredAuthors = map[string]bool{
+	"renovate[bot]":   true,
+	"dependabot":      true,
+	"dependabot[bot]": true,
+	"antrea-bot":      true,
+}
+
 type Config struct {
 	GoogleAPIKey string
 	GitHubToken  string
@@ -138,6 +145,10 @@ func run() error {
 		return fmt.Errorf("failed to fetch PRs: %w", err)
 	}
 	log.Printf("Found %d PRs", len(prs))
+
+	// Filter out bot-authored PRs
+	prs = filterBotPRs(prs)
+	log.Printf("After filtering bot PRs: %d PRs remaining", len(prs))
 
 	// Load prompt template
 	promptTemplate, err := os.ReadFile("PROMPT.md")
@@ -652,13 +663,18 @@ func handleCherryPicks(ctx context.Context, client *github.Client, branch string
 	return prs, nil
 }
 
+func filterBotPRs(prs []PRInfo) []PRInfo {
+	filtered := make([]PRInfo, 0, len(prs))
+	for _, pr := range prs {
+		if !ignoredAuthors[pr.Author] {
+			filtered = append(filtered, pr)
+		}
+	}
+	return filtered
+}
+
 func fetchUnlabeledPRs(ctx context.Context, client *github.Client, branch string, since time.Time) ([]PRInfo, error) {
 	var prs []PRInfo
-
-	ignoredAuthors := map[string]bool{
-		"app/dependabot": true,
-		"antrea-bot":     true,
-	}
 
 	opts := &github.PullRequestListOptions{
 		State:     "closed",
@@ -682,11 +698,6 @@ func fetchUnlabeledPRs(ctx context.Context, client *github.Client, branch string
 			}
 			if pull.MergedAt.Before(since) {
 				return prs, nil
-			}
-
-			// Skip ignored authors
-			if ignoredAuthors[pull.User.GetLogin()] {
-				continue
 			}
 
 			// Check if PR has action/release-note or kind/cherry-pick label

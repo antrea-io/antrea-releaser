@@ -88,6 +88,7 @@ go build -o bin/prepare-changelog ./cmd/prepare-changelog
    - PRs with `action/release-note` label
    - Original PRs from cherry-picks (for patch releases)
    - Unlabeled PRs (when `--all` is specified)
+   - **Filters out all bot PRs** (renovate[bot], dependabot, antrea-bot)
 5. **AI Analysis**: Sends PR data and historical context to Gemini API for classification
 6. **Save Model Data**: Saves two JSON files:
    - `changelog-model-output-<VERSION>-<TIMESTAMP>.json`: Complete model response
