@@ -14,7 +14,7 @@ An AI-powered tool to generate CHANGELOG drafts for Antrea releases using Google
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.25 or later
 - Google API Key with Gemini API access
 - (Optional) GitHub Personal Access Token for higher rate limits
 
