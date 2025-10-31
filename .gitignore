@@ -2,4 +2,5 @@
 bin/
 changelog-model-output-*.json
 changelog-model-details-*.json
+changelog-model-prompt-*.txt
 

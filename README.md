@@ -90,7 +90,8 @@ go build -o bin/prepare-changelog ./cmd/prepare-changelog
    - Unlabeled PRs (when `--all` is specified)
    - **Filters out all bot PRs** (renovate[bot], dependabot, antrea-bot)
 5. **AI Analysis**: Sends PR data and historical context to Gemini API for classification
-6. **Save Model Data**: Saves two JSON files:
+6. **Save Model Data**: Saves three files:
+   - `changelog-model-prompt-<VERSION>-<TIMESTAMP>.txt`: Full prompt sent to model
    - `changelog-model-output-<VERSION>-<TIMESTAMP>.json`: Complete model response
    - `changelog-model-details-<VERSION>-<TIMESTAMP>.json`: Usage metadata (latency, tokens, cost)
 7. **CHANGELOG Generation**: Formats the AI response into standard CHANGELOG format
@@ -101,6 +102,8 @@ go build -o bin/prepare-changelog ./cmd/prepare-changelog
 When you run the tool, it creates several files:
 
 ### Model Output Files (Always Created)
+
+- **`changelog-model-prompt-<VERSION>-<TIMESTAMP>.txt`**: The complete prompt sent to the Gemini model, including the template, historical CHANGELOGs, and all PR data.
 
 - **`changelog-model-output-<VERSION>-<TIMESTAMP>.json`**: The raw structured JSON response from the Gemini model, containing all PR classifications, descriptions, and confidence scores.
 
@@ -117,6 +120,8 @@ When you run the tool, it creates several files:
     "estimated_cost_usd": 0.00438
   }
   ```
+
+All three files share the same timestamp for easy correlation.
 
 ### CHANGELOG Output (Optional)
 

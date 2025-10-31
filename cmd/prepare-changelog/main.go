@@ -178,8 +178,15 @@ func run() error {
 		}
 	}
 
-	// Save model output JSON
+	// Save prompt
 	timestamp := modelDetails.Timestamp
+	promptFile := fmt.Sprintf("changelog-model-prompt-%s-%s.txt", config.Release, timestamp)
+	if err := os.WriteFile(promptFile, []byte(prompt), 0644); err != nil {
+		return fmt.Errorf("failed to save prompt: %w", err)
+	}
+	log.Printf("Prompt saved to %s", promptFile)
+
+	// Save model output JSON
 	modelOutputFile := fmt.Sprintf("changelog-model-output-%s-%s.json", config.Release, timestamp)
 	if err := saveModelOutput(modelResponse, modelOutputFile); err != nil {
 		return fmt.Errorf("failed to save model output: %w", err)
