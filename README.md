@@ -4,7 +4,7 @@ An AI-powered tool to generate CHANGELOG drafts for Antrea releases using Google
 
 ## Features
 
-- **AI-Powered Analysis**: Uses Gemini 2.5 Flash to intelligently classify, describe, and rank PRs by importance
+- **AI-Powered Analysis**: Uses Google's Gemini 2.5 Flash to intelligently classify, describe, and rank PRs by importance
 - **Historical Consistency**: Automatically reuses descriptions from previous releases for backported fixes
 - **Context-Aware**: Includes recent CHANGELOGs as examples to maintain consistent style
 - **Smart Ordering**: PRs are automatically sorted by importance within each category (ADDED/CHANGED/FIXED)

@@ -27,11 +27,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/google/go-github/v67/github"
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 const (
@@ -799,19 +798,29 @@ func buildPrompt(template string, historicalCHANGELOGs string, prs []PRInfo, prC
 }
 
 func callGemini(ctx context.Context, apiKey, prompt, version, modelName string) (*ModelResponse, *ModelDetails, error) {
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  apiKey,
+		Backend: genai.BackendGeminiAPI,
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
-	defer client.Close()
 
-	model := client.GenerativeModel(modelName)
-	model.SetTemperature(0.2)
-	model.ResponseMIMEType = "application/json"
+	// Prepare the generation config
+	genConfig := &genai.GenerateContentConfig{
+		Temperature:      genai.Ptr(float32(0.2)),
+		ResponseMIMEType: "application/json",
+	}
+
+	// Prepare the content parts
+	parts := []*genai.Part{
+		{Text: prompt},
+	}
+	content := []*genai.Content{{Parts: parts}}
 
 	// Measure latency
 	startTime := time.Now()
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := client.Models.GenerateContent(ctx, modelName, content, genConfig)
 	latency := time.Since(startTime).Seconds()
 
 	if err != nil {
@@ -825,8 +834,8 @@ func callGemini(ctx context.Context, apiKey, prompt, version, modelName string) 
 	// Extract JSON from response
 	var jsonStr string
 	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			jsonStr += string(text)
+		if part.Text != "" {
+			jsonStr += part.Text
 		}
 	}
 
@@ -841,9 +850,9 @@ func callGemini(ctx context.Context, apiKey, prompt, version, modelName string) 
 	var estimatedCost float64
 
 	if resp.UsageMetadata != nil {
-		promptTokens = resp.UsageMetadata.PromptTokenCount
-		candidatesTokens = resp.UsageMetadata.CandidatesTokenCount
-		totalTokens = resp.UsageMetadata.TotalTokenCount
+		promptTokens = int32(resp.UsageMetadata.PromptTokenCount)
+		candidatesTokens = int32(resp.UsageMetadata.CandidatesTokenCount)
+		totalTokens = int32(resp.UsageMetadata.TotalTokenCount)
 
 		// Gemini 2.5 Flash pricing (as of 2025):
 		// Free tier: Up to 2M tokens/min, 10M tokens/day
