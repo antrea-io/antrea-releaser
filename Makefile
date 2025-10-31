@@ -17,8 +17,8 @@ bin:
 # Generate mocks for testing
 generate:
 	@echo "Generating mocks..."
-	@go run go.uber.org/mock/mockgen@latest -destination=pkg/changelog/mocks/mock_model_caller.go -package=mocks github.com/antrea-io/antrea-releaser/pkg/changelog/types ModelCaller
-	@go run go.uber.org/mock/mockgen@latest -destination=pkg/changelog/mocks/mock_github_client.go -package=mocks github.com/antrea-io/antrea-releaser/pkg/changelog/types GitHubClient
+	@go run go.uber.org/mock/mockgen@v0.6.0 -destination=pkg/changelog/mocks/mock_model_caller.go -package=mocks github.com/antrea-io/antrea-releaser/pkg/changelog/types ModelCaller
+	@go run go.uber.org/mock/mockgen@v0.6.0 -destination=pkg/changelog/mocks/mock_github_client.go -package=mocks github.com/antrea-io/antrea-releaser/pkg/changelog/types GitHubClient
 	@echo "Mock generation complete"
 
 # Run tests
