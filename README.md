@@ -4,9 +4,10 @@ An AI-powered tool to generate CHANGELOG drafts for Antrea releases using Google
 
 ## Features
 
-- **AI-Powered Analysis**: Uses Gemini 2.5 Flash to intelligently classify and describe PRs
+- **AI-Powered Analysis**: Uses Gemini 2.5 Flash to intelligently classify, describe, and rank PRs by importance
 - **Historical Consistency**: Automatically reuses descriptions from previous releases for backported fixes
 - **Context-Aware**: Includes recent CHANGELOGs as examples to maintain consistent style
+- **Smart Ordering**: PRs are automatically sorted by importance within each category (ADDED/CHANGED/FIXED)
 - **Cherry-Pick Support**: Handles patch releases with cherry-picked PRs
 - **Flexible Output**: Write to stdout or file
 - **Model Transparency**: Saves model output and usage details (latency, tokens, estimated cost) as JSON files
@@ -92,12 +93,17 @@ go build -o bin/prepare-changelog ./cmd/prepare-changelog
    - With `--all`: All merged PRs (for comprehensive analysis)
    - Cherry-picks are always included for patch releases
    - **Bot PRs are always filtered out** (renovate[bot], dependabot, antrea-bot)
-5. **AI Analysis**: Sends filtered PR data and historical context to Gemini API for classification
+5. **AI Analysis**: Sends filtered PR data and historical context to Gemini API for:
+   - Classification (ADDED/CHANGED/FIXED)
+   - One-sentence descriptions
+   - Inclusion scoring (whether to include in CHANGELOG)
+   - Importance scoring (for sorting within categories)
 6. **Save Model Data**: Saves three files:
    - `changelog-model-prompt-<VERSION>-<TIMESTAMP>.txt`: Full prompt sent to model
    - `changelog-model-output-<VERSION>-<TIMESTAMP>.json`: Complete model response
    - `changelog-model-details-<VERSION>-<TIMESTAMP>.json`: Usage metadata (latency, tokens, cost)
 7. **CHANGELOG Generation**: Formats the AI response into standard CHANGELOG format
+   - PRs sorted by `importance_score` within each category (highest first)
    - PRs with `include_score >= 50`: Included normally
    - PRs with `include_score 25-49`: Included with `*OPTIONAL*` prefix
    - PRs with `include_score < 25`: Excluded from output (but still in model JSON for troubleshooting)

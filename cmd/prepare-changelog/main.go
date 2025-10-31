@@ -75,6 +75,7 @@ type ChangeEntry struct {
 	Category          string `json:"category"`
 	Description       string `json:"description"`
 	IncludeScore      int    `json:"include_score"`
+	ImportanceScore   int    `json:"importance_score"`
 	ReusedFromHistory bool   `json:"reused_from_history"`
 	Author            string `json:"-"`
 }
@@ -924,6 +925,15 @@ func generateChangelog(version *Version, response *ModelResponse) string {
 		if category == "ADDED" || category == "CHANGED" || category == "FIXED" {
 			changesByCategory[category] = append(changesByCategory[category], change)
 		}
+	}
+
+	// Sort changes within each category by importance_score (descending)
+	for category := range changesByCategory {
+		changes := changesByCategory[category]
+		sort.Slice(changes, func(i, j int) bool {
+			return changes[i].ImportanceScore > changes[j].ImportanceScore
+		})
+		changesByCategory[category] = changes
 	}
 
 	// Collect authors

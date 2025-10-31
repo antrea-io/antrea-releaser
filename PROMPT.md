@@ -81,18 +81,23 @@ Use the `include_score` field (0-100) to indicate confidence that a PR should be
 
 **You MUST provide an entry for EVERY PR**, even those with low scores. This helps with troubleshooting.
 
-### Rule 4: Ranking by Importance
-Within each category (ADDED/CHANGED/FIXED), rank changes by importance using the historical CHANGELOGs as reference:
+### Rule 4: Importance Scoring
+Assign an `importance_score` (0-100) to each PR to indicate its significance. This is SEPARATE from `include_score`.
 
-**Study the order in the 3 recent CHANGELOGs to understand typical ranking patterns:**
-1. **High Priority**: User-facing features/fixes that affect most users or critical functionality
-2. **Medium Priority**: Significant features/fixes affecting specific use cases or components
-3. **Lower Priority**: Minor improvements, niche fixes, or dependency updates
+**Study the order in the 3 recent CHANGELOGs to understand typical importance patterns:**
+- **90-100**: Critical features, major architectural changes, high-impact bug fixes affecting most users
+- **70-89**: Significant features/fixes affecting specific use cases or important components
+- **50-69**: Moderate improvements, standard bug fixes, feature enhancements
+- **30-49**: Minor improvements, niche fixes, small enhancements
+- **0-29**: Very minor changes, dependency updates (unless security-related)
 
 **Special considerations:**
-- **Dependency updates**: Generally rank lower unless they're major upgrades or security-related
-- If included, place dependency updates at the END of their category
-- Security fixes should be ranked high regardless of scope
+- **New APIs**: Always high importance (90+)
+- **New CRDs**: Always high importance (90+)
+- **Security fixes**: Should have high importance (90+) regardless of scope
+- **Dependency updates**: Generally low importance (0-29) unless major upgrades or security-related
+- **Two PRs can have the same `include_score` (e.g., both 100) but different `importance_score`**
+- Changes will be sorted by `importance_score` within each category (highest first)
 
 
 ## Output Format
@@ -107,6 +112,7 @@ You MUST respond with a JSON object following this exact schema:
       "category": "<ADDED|CHANGED|FIXED>",
       "description": "<one sentence description>",
       "include_score": <0-100>,
+      "importance_score": <0-100>,
       "reused_from_history": <boolean>
     }
   ]
@@ -126,6 +132,13 @@ You MUST respond with a JSON object following this exact schema:
   - **50-74**: Medium confidence (moderate impact)
   - **25-49**: Low confidence (will show as *OPTIONAL* in CHANGELOG)
   - **0-24**: Very low confidence (will NOT appear in CHANGELOG)
+- **importance_score**: 0-100, the relative importance/impact of this change
+  - **90-100**: Critical/high-impact changes
+  - **70-89**: Significant changes
+  - **50-69**: Moderate changes
+  - **30-49**: Minor changes
+  - **0-29**: Very minor changes
+  - This determines the ORDER within each category (highest first)
 - **reused_from_history**: true if using historical entry, false otherwise
 
 ## Examples from Historical CHANGELOGs
