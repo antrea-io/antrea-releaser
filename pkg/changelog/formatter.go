@@ -69,7 +69,9 @@ func formatChangelog(ver *version.Version, response *types.ModelResponse) string
 
 	// Output each category
 	for _, category := range categories {
-		sb.WriteString(fmt.Sprintf("### %s\n\n", strings.Title(strings.ToLower(category))))
+		// Use simple capitalization for category headers (e.g., "Added", "Changed", "Fixed")
+		categoryTitle := strings.ToUpper(category[:1]) + strings.ToLower(category[1:])
+		sb.WriteString(fmt.Sprintf("### %s\n\n", categoryTitle))
 
 		changes := changesByCategory[category]
 		if len(changes) > 0 {

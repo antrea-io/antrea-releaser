@@ -1,0 +1,55 @@
+# golangci-lint configuration used for CI
+version: "2"
+run:
+  tests: true
+  timeout: 15m
+linters:
+  default: none
+  enable:
+    - gosec
+    - govet
+    - loggercheck
+    - misspell
+    - revive
+    - staticcheck
+    - unused
+  settings:
+    gosec:
+      excludes:
+       # At the time of writing this, the G115 rule is not even part of an
+       # official release of gosec. This rule causes a lot of errors to be
+       # reported in the codebase. While some of the reported errors should be
+       # addressed, a lot can also be ignored and there are also some clear false
+       # positives that should not be flagged by gosec in the first place (see
+       # https://github.com/securego/gosec/issues/1187). We will re-enable this
+       # rule in the future when it becomes more accurate.
+        - G115 # Potential integer overflow when converting between integer types
+    misspell:
+      ignore-rules:
+        - creater
+    revive:
+      confidence: 0.8
+      severity: warning
+      rules:
+        - name: unreachable-code
+        - name: errorf
+        - name: range
+        - name: superfluous-else
+        - name: var-declaration
+        - name: duplicated-imports
+  exclusions:
+    presets:
+      - legacy
+      - common-false-positives
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/antrea-io/antrea-releaser
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

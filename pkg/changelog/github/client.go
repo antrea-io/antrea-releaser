@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	gogithub "github.com/google/go-github/v67/github"
+	gogithub "github.com/google/go-github/v76/github"
 	"golang.org/x/oauth2"
 )
 
@@ -100,4 +100,3 @@ func (c *RealClient) GetPullRequest(ctx context.Context, owner, repo string, num
 	}
 	return pr, nil
 }
-

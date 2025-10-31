@@ -24,10 +24,11 @@ import (
 	"strings"
 	"time"
 
+	gogithub "github.com/google/go-github/v76/github"
+
 	"github.com/antrea-io/antrea-releaser/pkg/changelog/prompt"
 	"github.com/antrea-io/antrea-releaser/pkg/changelog/types"
 	"github.com/antrea-io/antrea-releaser/pkg/changelog/version"
-	gogithub "github.com/google/go-github/v67/github"
 )
 
 // ChangelogGenerator generates changelog entries using AI
@@ -573,7 +574,7 @@ func (g *ChangelogGenerator) buildPrompt(historicalCHANGELOGs string, prs []type
 
 		// Check if this PR is in historical cache
 		if historical, exists := prCache[pr.Number]; exists {
-			sb.WriteString(fmt.Sprintf("**HISTORICAL ENTRY (MUST REUSE):**\n"))
+			sb.WriteString("**HISTORICAL ENTRY (MUST REUSE):**\n")
 			sb.WriteString(fmt.Sprintf("- Category: %s\n", historical.Category))
 			sb.WriteString(fmt.Sprintf("- Description: %s\n", historical.Description))
 		}

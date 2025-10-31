@@ -18,7 +18,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/go-github/v67/github"
+	"github.com/google/go-github/v76/github"
 )
 
 // PRInfo contains information about a pull request

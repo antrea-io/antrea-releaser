@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/antrea-io/antrea-releaser/pkg/changelog/types"
 	"google.golang.org/genai"
+
+	"github.com/antrea-io/antrea-releaser/pkg/changelog/types"
 )
 
 // GeminiCaller implements ModelCaller for Google's Gemini API
@@ -119,4 +120,3 @@ func (g *GeminiCaller) Call(ctx context.Context, prompt, version, modelName stri
 
 	return &modelResponse, details, nil
 }
-

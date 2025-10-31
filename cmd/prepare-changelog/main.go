@@ -23,10 +23,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/joho/godotenv"
+
 	"github.com/antrea-io/antrea-releaser/pkg/changelog"
 	"github.com/antrea-io/antrea-releaser/pkg/changelog/genai"
 	"github.com/antrea-io/antrea-releaser/pkg/changelog/github"
-	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -92,7 +93,7 @@ func run() error {
 
 	// Save prompt to file
 	promptFilename := fmt.Sprintf("changelog-model-prompt-%s-%s.txt", *release, promptData.Timestamp)
-	if err := os.WriteFile(promptFilename, []byte(promptData.Text), 0644); err != nil {
+	if err := os.WriteFile(promptFilename, []byte(promptData.Text), 0600); err != nil {
 		return fmt.Errorf("failed to write prompt file: %w", err)
 	}
 	log.Printf("Saved prompt to %s", promptFilename)
@@ -103,7 +104,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal model response: %w", err)
 	}
-	if err := os.WriteFile(outputFilename, outputJSON, 0644); err != nil {
+	if err := os.WriteFile(outputFilename, outputJSON, 0600); err != nil {
 		return fmt.Errorf("failed to write model output file: %w", err)
 	}
 	log.Printf("Saved model output to %s", outputFilename)
@@ -114,7 +115,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal model details: %w", err)
 	}
-	if err := os.WriteFile(detailsFilename, detailsJSON, 0644); err != nil {
+	if err := os.WriteFile(detailsFilename, detailsJSON, 0600); err != nil {
 		return fmt.Errorf("failed to write model details file: %w", err)
 	}
 	log.Printf("Saved model details to %s", detailsFilename)
@@ -122,7 +123,7 @@ func run() error {
 
 	// Output changelog
 	if *outputFile != "" {
-		if err := os.WriteFile(*outputFile, []byte(changelogText), 0644); err != nil {
+		if err := os.WriteFile(*outputFile, []byte(changelogText), 0600); err != nil {
 			return fmt.Errorf("failed to write output file: %w", err)
 		}
 		log.Printf("Changelog written to %s", *outputFile)
