@@ -47,13 +47,14 @@ var ignoredAuthors = map[string]bool{
 }
 
 type Config struct {
-	GoogleAPIKey string
-	GitHubToken  string
-	Release      string
-	FromRelease  string
-	All          bool
-	OutputFile   string
-	Model        string
+	GoogleAPIKey  string
+	GitHubToken   string
+	Release       string
+	FromRelease   string
+	All           bool
+	OutputFile    string
+	Model         string
+	MinConfidence int
 }
 
 type PRInfo struct {
@@ -140,7 +141,7 @@ func run() error {
 
 	// Fetch PR data
 	log.Println("Fetching PR data from GitHub...")
-	prs, err := fetchPRs(ctx, githubClient, branch, config.FromRelease, version)
+	prs, err := fetchPRs(ctx, githubClient, branch, config.FromRelease, version, config.All)
 	if err != nil {
 		return fmt.Errorf("failed to fetch PRs: %w", err)
 	}
@@ -201,7 +202,7 @@ func run() error {
 	log.Printf("Model details saved to %s", modelDetailsFile)
 
 	// Generate CHANGELOG
-	changelog := generateChangelog(version, modelResponse, config.All)
+	changelog := generateChangelog(version, modelResponse, config.MinConfidence)
 
 	// Output
 	if config.OutputFile != "" {
@@ -227,9 +228,10 @@ func loadConfig() (*Config, error) {
 	// Parse command-line flags
 	release := flag.String("release", "", "The release for which the changelog is generated (required)")
 	fromRelease := flag.String("from-release", "", "The last release from which the changelog is generated (optional)")
-	all := flag.Bool("all", false, "Include PRs that are not labelled with 'action/release-note' in a separate section")
+	all := flag.Bool("all", false, "Send all PRs to the model for analysis (not just those with 'action/release-note' label)")
 	output := flag.String("output", "", "Output file path (default: stdout)")
 	model := flag.String("model", "gemini-2.5-flash", "Gemini model to use (must start with 'gemini-')")
+	minConfidence := flag.Int("min-confidence", 50, "Minimum confidence threshold (0-100); PRs below this are prefixed with '*LOW CONFIDENCE*'")
 	flag.Parse()
 
 	if *release == "" {
@@ -242,6 +244,11 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("model must start with 'gemini-', got: %s", *model)
 	}
 
+	// Validate min-confidence
+	if *minConfidence < 0 || *minConfidence > 100 {
+		return nil, fmt.Errorf("min-confidence must be between 0 and 100, got: %d", *minConfidence)
+	}
+
 	// Get API keys
 	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
 	if googleAPIKey == "" {
@@ -251,13 +258,14 @@ func loadConfig() (*Config, error) {
 	githubToken := os.Getenv("GITHUB_TOKEN")
 
 	return &Config{
-		GoogleAPIKey: googleAPIKey,
-		GitHubToken:  githubToken,
-		Release:      *release,
-		FromRelease:  *fromRelease,
-		All:          *all,
-		OutputFile:   *output,
-		Model:        *model,
+		GoogleAPIKey:  googleAPIKey,
+		GitHubToken:   githubToken,
+		Release:       *release,
+		FromRelease:   *fromRelease,
+		All:           *all,
+		OutputFile:    *output,
+		Model:         *model,
+		MinConfidence: *minConfidence,
 	}, nil
 }
 
@@ -452,7 +460,7 @@ func parseCHANGELOG(content string, prCache map[int]HistoricalPR) {
 	}
 }
 
-func fetchPRs(ctx context.Context, client *github.Client, branch, fromRelease string, version *Version) ([]PRInfo, error) {
+func fetchPRs(ctx context.Context, client *github.Client, branch, fromRelease string, version *Version, fetchAll bool) ([]PRInfo, error) {
 	var allPRs []PRInfo
 
 	// Get the merge time of the from-release to use as start time
@@ -463,12 +471,23 @@ func fetchPRs(ctx context.Context, client *github.Client, branch, fromRelease st
 
 	log.Printf("Fetching PRs merged after %s", releaseStartTime.Format(time.RFC3339))
 
-	// Fetch PRs with action/release-note label
-	prsWithLabel, err := fetchPRsWithLabel(ctx, client, branch, releaseStartTime, "action/release-note")
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch PRs with action/release-note label: %w", err)
+	if fetchAll {
+		// Fetch all PRs (except those with kind/cherry-pick label which are handled separately)
+		log.Println("Fetching all PRs for model analysis...")
+		allMergedPRs, err := fetchAllPRs(ctx, client, branch, releaseStartTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch all PRs: %w", err)
+		}
+		allPRs = append(allPRs, allMergedPRs...)
+	} else {
+		// Fetch only PRs with action/release-note label
+		log.Println("Fetching PRs with action/release-note label...")
+		prsWithLabel, err := fetchPRsWithLabel(ctx, client, branch, releaseStartTime, "action/release-note")
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch PRs with action/release-note label: %w", err)
+		}
+		allPRs = append(allPRs, prsWithLabel...)
 	}
-	allPRs = append(allPRs, prsWithLabel...)
 
 	// For patch releases, handle cherry-picks
 	if version.Patch != 0 {
@@ -478,13 +497,6 @@ func fetchPRs(ctx context.Context, client *github.Client, branch, fromRelease st
 		}
 		allPRs = append(allPRs, cherryPickPRs...)
 	}
-
-	// Fetch unlabeled PRs (for --all flag)
-	unlabeledPRs, err := fetchUnlabeledPRs(ctx, client, branch, releaseStartTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch unlabeled PRs: %w", err)
-	}
-	allPRs = append(allPRs, unlabeledPRs...)
 
 	// Deduplicate PRs by number
 	prMap := make(map[int]PRInfo)
@@ -680,7 +692,7 @@ func filterBotPRs(prs []PRInfo) []PRInfo {
 	return filtered
 }
 
-func fetchUnlabeledPRs(ctx context.Context, client *github.Client, branch string, since time.Time) ([]PRInfo, error) {
+func fetchAllPRs(ctx context.Context, client *github.Client, branch string, since time.Time) ([]PRInfo, error) {
 	var prs []PRInfo
 
 	opts := &github.PullRequestListOptions{
@@ -873,7 +885,7 @@ func saveModelDetails(details *ModelDetails, filename string) error {
 	return nil
 }
 
-func generateChangelog(version *Version, response *ModelResponse, includeAll bool) string {
+func generateChangelog(version *Version, response *ModelResponse, minConfidence int) string {
 	var sb strings.Builder
 
 	// Title for minor releases only
@@ -887,18 +899,11 @@ func generateChangelog(version *Version, response *ModelResponse, includeAll boo
 	// Group changes by category
 	categories := []string{"ADDED", "CHANGED", "FIXED"}
 	changesByCategory := make(map[string][]ChangeEntry)
-	var unlabeled []ChangeEntry
 
 	for _, change := range response.Changes {
-		if change.ConfidenceInclude < 50 && !includeAll {
-			continue
-		}
-
 		category := strings.ToUpper(change.Category)
 		if category == "ADDED" || category == "CHANGED" || category == "FIXED" {
 			changesByCategory[category] = append(changesByCategory[category], change)
-		} else if includeAll && change.ConfidenceInclude < 100 {
-			unlabeled = append(unlabeled, change)
 		}
 	}
 
@@ -912,23 +917,16 @@ func generateChangelog(version *Version, response *ModelResponse, includeAll boo
 		changes := changesByCategory[category]
 		if len(changes) > 0 {
 			for _, change := range changes {
-				sb.WriteString(fmt.Sprintf("- %s. ([#%d](https://github.com/antrea-io/antrea/pull/%d), [@%s])\n",
-					change.Description, change.PRNumber, change.PRNumber, change.Author))
+				prefix := ""
+				if change.ConfidenceInclude < minConfidence {
+					prefix = "*LOW CONFIDENCE* "
+				}
+				sb.WriteString(fmt.Sprintf("- %s%s. ([#%d](https://github.com/antrea-io/antrea/pull/%d), [@%s])\n",
+					prefix, change.Description, change.PRNumber, change.PRNumber, change.Author))
 				authorSet[change.Author] = true
 			}
 		}
 
-		sb.WriteString("\n")
-	}
-
-	// Add unlabeled section if requested
-	if includeAll && len(unlabeled) > 0 {
-		sb.WriteString("### Unlabeled (Remove this section eventually)\n\n")
-		for _, change := range unlabeled {
-			sb.WriteString(fmt.Sprintf("- %s. ([#%d](https://github.com/antrea-io/antrea/pull/%d), [@%s])\n",
-				change.Description, change.PRNumber, change.PRNumber, change.Author))
-			authorSet[change.Author] = true
-		}
 		sb.WriteString("\n")
 	}
 

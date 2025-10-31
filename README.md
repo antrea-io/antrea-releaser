@@ -53,7 +53,7 @@ go run ./cmd/prepare-changelog --release 2.5.0
 # Specify the starting release (auto-calculated if omitted)
 go run ./cmd/prepare-changelog --release 2.5.0 --from-release 2.4.0
 
-# Include unlabeled PRs in a separate section
+# Send ALL PRs to the model (not just those with action/release-note label)
 go run ./cmd/prepare-changelog --release 2.5.0 --all
 
 # Write output to a file
@@ -61,6 +61,9 @@ go run ./cmd/prepare-changelog --release 2.5.0 --output CHANGELOG-draft.md
 
 # Use a different Gemini model
 go run ./cmd/prepare-changelog --release 2.5.0 --model gemini-1.5-pro
+
+# Set a custom confidence threshold (PRs below 70 will be prefixed with *LOW CONFIDENCE*)
+go run ./cmd/prepare-changelog --release 2.5.0 --min-confidence 70
 
 # Patch release example
 go run ./cmd/prepare-changelog --release 2.4.1
@@ -84,17 +87,19 @@ go build -o bin/prepare-changelog ./cmd/prepare-changelog
 1. **Environment Setup**: Loads API keys from `.env` and environment variables
 2. **Version Analysis**: Parses release version and determines target branch
 3. **Historical Context**: Fetches and parses the 3 most recent CHANGELOGs from GitHub
-4. **PR Collection**: Fetches all relevant PRs from GitHub, including:
-   - PRs with `action/release-note` label
-   - Original PRs from cherry-picks (for patch releases)
-   - Unlabeled PRs (when `--all` is specified)
-   - **Filters out all bot PRs** (renovate[bot], dependabot, antrea-bot)
-5. **AI Analysis**: Sends PR data and historical context to Gemini API for classification
+4. **PR Collection**: Fetches PRs from GitHub based on `--all` flag:
+   - Without `--all`: Only PRs with `action/release-note` label
+   - With `--all`: All merged PRs (for comprehensive analysis)
+   - Cherry-picks are always included for patch releases
+   - **Bot PRs are always filtered out** (renovate[bot], dependabot, antrea-bot)
+5. **AI Analysis**: Sends filtered PR data and historical context to Gemini API for classification
 6. **Save Model Data**: Saves three files:
    - `changelog-model-prompt-<VERSION>-<TIMESTAMP>.txt`: Full prompt sent to model
    - `changelog-model-output-<VERSION>-<TIMESTAMP>.json`: Complete model response
    - `changelog-model-details-<VERSION>-<TIMESTAMP>.json`: Usage metadata (latency, tokens, cost)
 7. **CHANGELOG Generation**: Formats the AI response into standard CHANGELOG format
+   - PRs below `--min-confidence` threshold are prefixed with `*LOW CONFIDENCE*`
+   - All PRs from the model response are included (no filtering at this stage)
 8. **Output**: Writes to stdout or specified file
 
 ## Generated Files
@@ -136,9 +141,10 @@ All JSON files are automatically ignored by Git.
 
 - `--release` (required): Target release version (e.g., "2.5.0")
 - `--from-release` (optional): Starting release version (auto-calculated if omitted)
-- `--all` (optional): Include unlabeled PRs in a separate section
+- `--all` (optional): Send ALL PRs to the model for analysis, not just those with `action/release-note` label (default: false)
 - `--output` (optional): Output file path (default: stdout)
 - `--model` (optional): Gemini model to use (default: "gemini-2.5-flash", must start with "gemini-")
+- `--min-confidence` (optional): Minimum confidence threshold 0-100 (default: 50); PRs below this are prefixed with `*LOW CONFIDENCE*` in the CHANGELOG
 
 ### Supported Gemini Models
 
