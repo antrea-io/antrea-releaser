@@ -3,6 +3,7 @@ module github.com/antrea-io/antrea-releaser
 go 1.25.0
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/google/go-github/v67 v67.0.0
 	github.com/joho/godotenv v1.5.1
 	golang.org/x/oauth2 v0.32.0
@@ -20,10 +21,10 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/crypto v0.41.0 // indirect
+	golang.org/x/net v0.43.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect

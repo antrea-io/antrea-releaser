@@ -4,3 +4,23 @@ changelog-model-output-*.json
 changelog-model-details-*.json
 changelog-model-prompt-*.txt
 
+IMPLEMENTATION.md
+
+.DS_Store
+
+# VIM
+.*.swp
+
+# Emacs
+*~
+
+# Common backup files
+*.bak
+
+.idea/
+.vscode/
+vendor
+
+.cursor
+
+prepare-changelog.sh

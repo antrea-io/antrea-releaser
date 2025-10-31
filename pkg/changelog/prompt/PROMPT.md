@@ -72,7 +72,9 @@ Use the `include_score` field (0-100) to indicate confidence that a PR should be
 - **75-99**: High confidence - user-facing features, important fixes, significant changes
 - **50-74**: Medium confidence - moderate impact changes, minor features
 - **25-49**: Low confidence - uncertain if users care, but might be relevant (will show as *OPTIONAL*)
-- **0-24**: Very low confidence - likely not relevant (will NOT appear in CHANGELOG)
+- **0-24**: Very low confidence - likely not relevant (will NOT appear in
+  CHANGELOG), for example, enhancements or fixes to infrastructure, tests or
+  development processes
 
 **What gets included in the CHANGELOG:**
 - `include_score >= 50`: Included normally
@@ -89,13 +91,14 @@ Assign an `importance_score` (0-100) to each PR to indicate its significance. Th
 - **70-89**: Significant features/fixes affecting specific use cases or important components
 - **50-69**: Moderate improvements, standard bug fixes, feature enhancements
 - **30-49**: Minor improvements, niche fixes, small enhancements
-- **0-29**: Very minor changes, dependency updates (unless security-related)
+- **0-29**: Very minor changes, dependency updates
 
 **Special considerations:**
 - **New APIs**: Always high importance (90+)
 - **New CRDs**: Always high importance (90+)
-- **Security fixes**: Should have high importance (90+) regardless of scope
-- **Dependency updates**: Generally low importance (0-29) unless major upgrades or security-related
+- **Security fixes in Antrea code**: High importance (90+)
+- **Dependency updates**: Generally low importance (0-29), **even if they fix CVEs**
+  - Exception: If the update introduces significant new functionality or changes to Antrea's behavior, it may warrant higher importance
 - **Two PRs can have the same `include_score` (e.g., both 100) but different `importance_score`**
 - Changes will be sorted by `importance_score` within each category (highest first)
 
