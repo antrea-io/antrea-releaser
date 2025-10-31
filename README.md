@@ -62,8 +62,8 @@ go run ./cmd/prepare-changelog --release 2.5.0 --output CHANGELOG-draft.md
 # Use a different Gemini model
 go run ./cmd/prepare-changelog --release 2.5.0 --model gemini-1.5-pro
 
-# Set a custom confidence threshold (PRs below 70 will be prefixed with *LOW CONFIDENCE*)
-go run ./cmd/prepare-changelog --release 2.5.0 --min-confidence 70
+# Combine with other options
+go run ./cmd/prepare-changelog --release 2.5.0 --all --model gemini-1.5-pro
 
 # Patch release example
 go run ./cmd/prepare-changelog --release 2.4.1
@@ -98,8 +98,9 @@ go build -o bin/prepare-changelog ./cmd/prepare-changelog
    - `changelog-model-output-<VERSION>-<TIMESTAMP>.json`: Complete model response
    - `changelog-model-details-<VERSION>-<TIMESTAMP>.json`: Usage metadata (latency, tokens, cost)
 7. **CHANGELOG Generation**: Formats the AI response into standard CHANGELOG format
-   - PRs below `--min-confidence` threshold are prefixed with `*LOW CONFIDENCE*`
-   - All PRs from the model response are included (no filtering at this stage)
+   - PRs with `include_score >= 50`: Included normally
+   - PRs with `include_score 25-49`: Included with `*OPTIONAL*` prefix
+   - PRs with `include_score < 25`: Excluded from output (but still in model JSON for troubleshooting)
 8. **Output**: Writes to stdout or specified file
 
 ## Generated Files
@@ -144,7 +145,6 @@ All JSON files are automatically ignored by Git.
 - `--all` (optional): Send ALL PRs to the model for analysis, not just those with `action/release-note` label (default: false)
 - `--output` (optional): Output file path (default: stdout)
 - `--model` (optional): Gemini model to use (default: "gemini-2.5-flash", must start with "gemini-")
-- `--min-confidence` (optional): Minimum confidence threshold 0-100 (default: 50); PRs below this are prefixed with `*LOW CONFIDENCE*` in the CHANGELOG
 
 ### Supported Gemini Models
 

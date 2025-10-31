@@ -47,14 +47,13 @@ var ignoredAuthors = map[string]bool{
 }
 
 type Config struct {
-	GoogleAPIKey  string
-	GitHubToken   string
-	Release       string
-	FromRelease   string
-	All           bool
-	OutputFile    string
-	Model         string
-	MinConfidence int
+	GoogleAPIKey string
+	GitHubToken  string
+	Release      string
+	FromRelease  string
+	All          bool
+	OutputFile   string
+	Model        string
 }
 
 type PRInfo struct {
@@ -72,15 +71,12 @@ type HistoricalPR struct {
 }
 
 type ChangeEntry struct {
-	PRNumber                 int    `json:"pr_number"`
-	Category                 string `json:"category"`
-	Description              string `json:"description"`
-	ConfidenceDescription    int    `json:"confidence_description"`
-	ConfidenceClassification int    `json:"confidence_classification"`
-	ConfidenceInclude        int    `json:"confidence_include"`
-	GroupedWith              []int  `json:"grouped_with"`
-	ReusedFromHistory        bool   `json:"reused_from_history"`
-	Author                   string `json:"-"`
+	PRNumber          int    `json:"pr_number"`
+	Category          string `json:"category"`
+	Description       string `json:"description"`
+	IncludeScore      int    `json:"include_score"`
+	ReusedFromHistory bool   `json:"reused_from_history"`
+	Author            string `json:"-"`
 }
 
 type ModelResponse struct {
@@ -202,7 +198,7 @@ func run() error {
 	log.Printf("Model details saved to %s", modelDetailsFile)
 
 	// Generate CHANGELOG
-	changelog := generateChangelog(version, modelResponse, config.MinConfidence)
+	changelog := generateChangelog(version, modelResponse)
 
 	// Output
 	if config.OutputFile != "" {
@@ -231,7 +227,6 @@ func loadConfig() (*Config, error) {
 	all := flag.Bool("all", false, "Send all PRs to the model for analysis (not just those with 'action/release-note' label)")
 	output := flag.String("output", "", "Output file path (default: stdout)")
 	model := flag.String("model", "gemini-2.5-flash", "Gemini model to use (must start with 'gemini-')")
-	minConfidence := flag.Int("min-confidence", 50, "Minimum confidence threshold (0-100); PRs below this are prefixed with '*LOW CONFIDENCE*'")
 	flag.Parse()
 
 	if *release == "" {
@@ -244,11 +239,6 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("model must start with 'gemini-', got: %s", *model)
 	}
 
-	// Validate min-confidence
-	if *minConfidence < 0 || *minConfidence > 100 {
-		return nil, fmt.Errorf("min-confidence must be between 0 and 100, got: %d", *minConfidence)
-	}
-
 	// Get API keys
 	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
 	if googleAPIKey == "" {
@@ -258,14 +248,13 @@ func loadConfig() (*Config, error) {
 	githubToken := os.Getenv("GITHUB_TOKEN")
 
 	return &Config{
-		GoogleAPIKey:  googleAPIKey,
-		GitHubToken:   githubToken,
-		Release:       *release,
-		FromRelease:   *fromRelease,
-		All:           *all,
-		OutputFile:    *output,
-		Model:         *model,
-		MinConfidence: *minConfidence,
+		GoogleAPIKey: googleAPIKey,
+		GitHubToken:  githubToken,
+		Release:      *release,
+		FromRelease:  *fromRelease,
+		All:          *all,
+		OutputFile:   *output,
+		Model:        *model,
 	}, nil
 }
 
@@ -375,20 +364,42 @@ func fetchHistoricalCHANGELOGs(ctx context.Context, client *github.Client) (stri
 		return vi.Patch > vj.Patch
 	})
 
-	// Take the 3 most recent
-	numToFetch := 3
-	if len(changelogFiles) < numToFetch {
-		numToFetch = len(changelogFiles)
+	// Parse ALL CHANGELOGs for PR cache (historical consistency)
+	// But only include the 3 most recent in the prompt (for styling guidance)
+	prCache := make(map[int]HistoricalPR)
+
+	log.Printf("Parsing %d CHANGELOG files for historical PR entries...", len(changelogFiles))
+	for _, file := range changelogFiles {
+		// Fetch raw content
+		fileContent, _, _, err := client.Repositories.GetContents(ctx, repoOwner, repoName, "CHANGELOG/"+file.name, nil)
+		if err != nil {
+			log.Printf("Warning: failed to fetch %s: %v", file.name, err)
+			continue
+		}
+
+		content, err := fileContent.GetContent()
+		if err != nil {
+			log.Printf("Warning: failed to decode %s: %v", file.name, err)
+			continue
+		}
+
+		// Parse ALL files for PR cache
+		parseCHANGELOG(content, prCache)
+	}
+	log.Printf("Found %d unique historical PR entries across all CHANGELOGs", len(prCache))
+
+	// Include only the 3 most recent CHANGELOGs in the prompt (for styling)
+	numToInclude := 3
+	if len(changelogFiles) < numToInclude {
+		numToInclude = len(changelogFiles)
 	}
 
 	var historicalContent strings.Builder
-	prCache := make(map[int]HistoricalPR)
-
-	for i := 0; i < numToFetch; i++ {
+	for i := 0; i < numToInclude; i++ {
 		file := changelogFiles[i]
-		log.Printf("Fetching %s...", file.name)
+		log.Printf("Including %s in prompt for styling reference...", file.name)
 
-		// Fetch raw content
+		// Fetch raw content again (we need the full text for the prompt)
 		fileContent, _, _, err := client.Repositories.GetContents(ctx, repoOwner, repoName, "CHANGELOG/"+file.name, nil)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to fetch %s: %w", file.name, err)
@@ -401,9 +412,6 @@ func fetchHistoricalCHANGELOGs(ctx context.Context, client *github.Client) (stri
 
 		historicalContent.WriteString(fmt.Sprintf("\n\n=== %s ===\n\n", file.name))
 		historicalContent.WriteString(content)
-
-		// Parse for PR numbers and descriptions
-		parseCHANGELOG(content, prCache)
 	}
 
 	return historicalContent.String(), prCache, nil
@@ -888,7 +896,7 @@ func saveModelDetails(details *ModelDetails, filename string) error {
 	return nil
 }
 
-func generateChangelog(version *Version, response *ModelResponse, minConfidence int) string {
+func generateChangelog(version *Version, response *ModelResponse) string {
 	var sb strings.Builder
 
 	// Title for minor releases only
@@ -899,11 +907,19 @@ func generateChangelog(version *Version, response *ModelResponse, minConfidence 
 	// Release header
 	sb.WriteString(fmt.Sprintf("## %d.%d.%d - %s\n\n", version.Major, version.Minor, version.Patch, time.Now().Format("2006-01-02")))
 
-	// Group changes by category
+	// Group changes by category based on include_score
+	// >= 50: include normally
+	// 25-49: include with *OPTIONAL* prefix
+	// < 25: exclude from CHANGELOG
 	categories := []string{"ADDED", "CHANGED", "FIXED"}
 	changesByCategory := make(map[string][]ChangeEntry)
 
 	for _, change := range response.Changes {
+		// Skip PRs with include_score < 25
+		if change.IncludeScore < 25 {
+			continue
+		}
+
 		category := strings.ToUpper(change.Category)
 		if category == "ADDED" || category == "CHANGED" || category == "FIXED" {
 			changesByCategory[category] = append(changesByCategory[category], change)
@@ -921,8 +937,8 @@ func generateChangelog(version *Version, response *ModelResponse, minConfidence 
 		if len(changes) > 0 {
 			for _, change := range changes {
 				prefix := ""
-				if change.ConfidenceInclude < minConfidence {
-					prefix = "*LOW CONFIDENCE* "
+				if change.IncludeScore >= 25 && change.IncludeScore < 50 {
+					prefix = "*OPTIONAL* "
 				}
 				sb.WriteString(fmt.Sprintf("- %s%s. ([#%d](https://github.com/antrea-io/antrea/pull/%d), [@%s])\n",
 					prefix, change.Description, change.PRNumber, change.PRNumber, change.Author))

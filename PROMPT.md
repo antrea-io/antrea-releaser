@@ -52,44 +52,48 @@ Bug fixes and corrections. Examples:
 - Use the EXACT description from the historical entry
 - Use the EXACT category from the historical entry
 - Set `reused_from_history` to `true`
-- Set `confidence_description` and `confidence_classification` to 100
+- Set `include_score` to 100
 
 This is critical because the same bug fix may appear in multiple releases (e.g., fixed in v2.5.0 and backported to v2.4.1, v2.3.2).
 
 ### Rule 2: Release Note Label Requirement
 **PRs with the `action/release-note` label MUST be included:**
-- Set `confidence_include` to 100 for these PRs
+- Set `include_score` to 100 for these PRs
 - These are PRs that maintainers have explicitly marked as requiring release notes
 
-### Rule 3: Inclusion Criteria for Other PRs
-For PRs without the `action/release-note` label, include them only if they meet one of these criteria:
-- The change affects Antrea users directly (e.g., behavior changes, new features visible to users)
-- The change is architecturally significant (e.g., major refactoring, dependency upgrades)
-- The change fixes a user-visible bug
+### Rule 3: Inclusion Philosophy - Err on the Side of Inclusion
+**IMPORTANT**: It is better to include too many changes than too few. When in doubt, include the PR.
 
-Exclude:
-- Internal refactoring with no user impact
-- Minor dependency updates (patch versions)
-- Test-only changes
-- Documentation-only changes
-- CI/CD improvements
+Use the `include_score` field (0-100) to indicate confidence that a PR should be in the CHANGELOG:
+
+**Scoring Guidelines:**
+- **100**: PRs with `action/release-note` label (MUST include)
+- **100**: PRs with historical entries (MUST reuse)
+- **75-99**: High confidence - user-facing features, important fixes, significant changes
+- **50-74**: Medium confidence - moderate impact changes, minor features
+- **25-49**: Low confidence - uncertain if users care, but might be relevant (will show as *OPTIONAL*)
+- **0-24**: Very low confidence - likely not relevant (will NOT appear in CHANGELOG)
+
+**What gets included in the CHANGELOG:**
+- `include_score >= 50`: Included normally
+- `include_score 25-49`: Included with `*OPTIONAL*` prefix
+- `include_score < 25`: NOT included in CHANGELOG output
+
+**You MUST provide an entry for EVERY PR**, even those with low scores. This helps with troubleshooting.
 
 ### Rule 4: Ranking by Importance
-Within each category (ADDED/CHANGED/FIXED), rank changes by importance:
-1. User-facing features/changes that affect most users
-2. Significant features/changes affecting specific use cases
-3. Minor improvements or niche fixes
+Within each category (ADDED/CHANGED/FIXED), rank changes by importance using the historical CHANGELOGs as reference:
 
-### Rule 5: Grouping Related Changes
-When multiple PRs work together to deliver a single feature, group them:
-- Use the `grouped_with` field to indicate related PRs
-- Typically the main PR should have the most comprehensive description
-- Related PRs can reference the main PR's number in `grouped_with`
+**Study the order in the 3 recent CHANGELOGs to understand typical ranking patterns:**
+1. **High Priority**: User-facing features/fixes that affect most users or critical functionality
+2. **Medium Priority**: Significant features/fixes affecting specific use cases or components
+3. **Lower Priority**: Minor improvements, niche fixes, or dependency updates
 
-Example: If PRs #1234, #1235, and #1236 all implement parts of a new "XYZ" feature:
-- PR #1234 (main): description = "Add XYZ feature...", grouped_with = [1235, 1236]
-- PR #1235: description = "Add XYZ feature..." (same), grouped_with = [1234, 1236]
-- PR #1236: description = "Add XYZ feature..." (same), grouped_with = [1234, 1235]
+**Special considerations:**
+- **Dependency updates**: Generally rank lower unless they're major upgrades or security-related
+- If included, place dependency updates at the END of their category
+- Security fixes should be ranked high regardless of scope
+
 
 ## Output Format
 
@@ -102,28 +106,26 @@ You MUST respond with a JSON object following this exact schema:
       "pr_number": <integer>,
       "category": "<ADDED|CHANGED|FIXED>",
       "description": "<one sentence description>",
-      "confidence_description": <0-100>,
-      "confidence_classification": <0-100>,
-      "confidence_include": <0-100>,
-      "grouped_with": [<pr_number>, ...],
+      "include_score": <0-100>,
       "reused_from_history": <boolean>
     }
   ]
 }
 ```
 
+**IMPORTANT**: You MUST include an entry for EVERY PR provided. Use `include_score` to indicate your confidence.
+
 ### Field Descriptions:
 
-- **pr_number**: The PR number (integer)
+- **pr_number**: The PR number (integer) - REQUIRED for every PR
 - **category**: One of "ADDED", "CHANGED", or "FIXED"
 - **description**: A single sentence describing the change (without the trailing period, as it will be added during formatting)
-- **confidence_description**: 0-100, how confident you are in the description quality
-- **confidence_classification**: 0-100, how confident you are in the category assignment
-- **confidence_include**: 0-100, how confident you are this should be in the CHANGELOG
-  - 100 for PRs with `action/release-note` label
-  - 100 for PRs with historical entries
-  - Lower values for unlabeled PRs based on user impact
-- **grouped_with**: Array of related PR numbers (empty array if not grouped)
+- **include_score**: 0-100, your confidence this should be in the CHANGELOG
+  - **100**: `action/release-note` label or historical entry (mandatory)
+  - **75-99**: High confidence (important user-facing change)
+  - **50-74**: Medium confidence (moderate impact)
+  - **25-49**: Low confidence (will show as *OPTIONAL* in CHANGELOG)
+  - **0-24**: Very low confidence (will NOT appear in CHANGELOG)
 - **reused_from_history**: true if using historical entry, false otherwise
 
 ## Examples from Historical CHANGELOGs
