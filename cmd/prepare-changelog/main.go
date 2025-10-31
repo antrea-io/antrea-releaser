@@ -719,18 +719,21 @@ func fetchAllPRs(ctx context.Context, client *github.Client, branch string, sinc
 				return prs, nil
 			}
 
-			// Check if PR has action/release-note or kind/cherry-pick label
-			hasLabel := false
+			// Collect labels
 			var labels []string
 			for _, l := range pull.Labels {
 				labels = append(labels, l.GetName())
-				if l.GetName() == "action/release-note" || l.GetName() == "kind/cherry-pick" {
-					hasLabel = true
+			}
+
+			// Skip cherry-pick PRs as they are handled separately
+			hasCherryPickLabel := false
+			for _, l := range labels {
+				if l == "kind/cherry-pick" {
+					hasCherryPickLabel = true
 					break
 				}
 			}
-
-			if hasLabel {
+			if hasCherryPickLabel {
 				continue
 			}
 
